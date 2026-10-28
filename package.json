@@ -1,0 +1,61 @@
+{
+  "name": "jobhunter-ai",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack --hostname 0.0.0.0",
+    "build": "prisma generate && next build --webpack",
+    "start": "next start --hostname 0.0.0.0",
+    "worker": "tsx src/server/worker.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "playwright test",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "db:migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate"
+  },
+  "dependencies": {
+    "next": "^16.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@prisma/client": "6.19.0",
+    "bullmq": "^5.61.0",
+    "ioredis": "^5.8.0",
+    "zod": "^3.25.0",
+    "@tanstack/react-query": "^5.90.0",
+    "react-hook-form": "^7.65.0",
+    "@hookform/resolvers": "^3.10.0",
+    "recharts": "^3.3.0",
+    "lucide-react": "^0.548.0",
+    "nodemailer": "^7.0.0",
+    "bcryptjs": "^3.0.2",
+    "jose": "^6.1.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.3.0",
+    "@radix-ui/react-slot": "^1.2.0",
+    "class-variance-authority": "^0.7.1",
+    "sonner": "^2.0.7"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "prisma": "6.19.0",
+    "tsx": "^4.20.0",
+    "@types/node": "^22.18.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/nodemailer": "^7.0.0",
+    "vitest": "^3.2.4",
+    "@playwright/test": "^1.56.0",
+    "tailwindcss": "^4.1.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "eslint": "^9.38.0",
+    "eslint-config-next": "^16.0.0",
+    "prettier": "^3.6.0",
+    "yaml": "^2.8.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

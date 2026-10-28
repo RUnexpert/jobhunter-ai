@@ -1,0 +1,68 @@
+name: jobhunter-ai
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: jobhunter
+      POSTGRES_USER: jobhunter
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run node scripts/init-env.mjs}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    ports: ['127.0.0.1:5432:5432']
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U jobhunter -d jobhunter']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, 'yes', --maxmemory, 256mb, --maxmemory-policy, noeviction]
+    volumes: [redis-data:/data]
+    ports: ['127.0.0.1:6379:6379']
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  migrate:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://jobhunter:${POSTGRES_PASSWORD}@postgres:5432/jobhunter?schema=public
+    command: [npm, run, db:migrate]
+    depends_on:
+      postgres: { condition: service_healthy }
+  web:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://jobhunter:${POSTGRES_PASSWORD}@postgres:5432/jobhunter?schema=public
+      REDIS_URL: redis://redis:6379
+    ports: ['127.0.0.1:3000:3000']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    init: true
+    restart: unless-stopped
+  worker:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://jobhunter:${POSTGRES_PASSWORD}@postgres:5432/jobhunter?schema=public
+      REDIS_URL: redis://redis:6379
+    command: [npm, run, worker]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    init: true
+    restart: unless-stopped
+  ollama:
+    image: ollama/ollama:latest
+    profiles: [local-ai]
+    volumes: [ollama-data:/root/.ollama]
+    restart: unless-stopped
+volumes:
+  postgres-data:
+  redis-data:
+  ollama-data:

@@ -1,0 +1,401 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApplicationStatus {
+  DISCOVERED
+  ANALYZING
+  READY_TO_APPLY
+  AWAITING_APPROVAL
+  APPLYING
+  APPLIED
+  FAILED
+  SKIPPED
+  REQUIRES_USER_ACTION
+}
+
+model User {
+  id            String             @id @default(cuid())
+  email         String             @unique
+  passwordHash  String
+  createdAt     DateTime           @default(now())
+  sessions      Session[]
+  account       HhAccount?
+  profile       CandidateProfile?
+  searches      SearchProfile[]
+  resumes       Resume[]
+  applications  Application[]
+  tasks         UserTask[]
+  notifications Notification[]
+  executions    AgentExecution[]
+  events        AgentEvent[]
+  providers     AIProviderConfig[]
+  settings      AppSettings?
+  oauth         OAuthAttempt[]
+  messages      EmployerMessage[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model OAuthAttempt {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verifier  String
+  expiresAt DateTime
+}
+
+model HhAccount {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  externalId   String   @unique
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  connected    Boolean  @default(true)
+  capabilities Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model CandidateProfile {
+  id          String           @id @default(cuid())
+  userId      String           @unique
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facts       String           @default("")
+  english     String           @default("")
+  salary      Int?
+  relocate    Boolean          @default(false)
+  travel      Boolean          @default(false)
+  preferences String           @default("")
+  constraints String           @default("")
+  skills      CandidateSkill[]
+  updatedAt   DateTime         @updatedAt
+}
+
+model CandidateSkill {
+  id        String           @id @default(cuid())
+  profileId String
+  profile   CandidateProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name      String
+  years     Float
+  evidence  String
+
+  @@unique([profileId, name])
+}
+
+model Resume {
+  id           String                @id @default(cuid())
+  userId       String
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  externalId   String?
+  title        String
+  content      String
+  skills       String[]
+  salary       Int?
+  currency     String                @default("RUR")
+  employment   String                @default("full")
+  workFormat   String                @default("REMOTE")
+  geography    String                @default("")
+  source       String                @default("USER_CONFIRMED")
+  updatedAt    DateTime              @updatedAt
+  applications Application[]
+  searches     SearchProfileResume[]
+
+  @@unique([userId, externalId])
+}
+
+model SearchProfile {
+  id              String                @id @default(cuid())
+  userId          String
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  active          Boolean               @default(true)
+  query           String
+  exclude         String[]
+  area            String                @default("113")
+  salaryMin       Int?
+  salaryMax       Int?
+  currency        String                @default("RUR")
+  employment      String                @default("full")
+  schedule        String                @default("")
+  workFormat      String                @default("REMOTE")
+  experience      String                @default("")
+  minScore        Int                   @default(75)
+  dailyLimit      Int                   @default(10)
+  intervalMinutes Int                   @default(60)
+  mode            String                @default("APPROVAL")
+  letterPolicy    String                @default("AI")
+  blacklist       String[]
+  whitelist       String[]
+  weights         Json                  @default("{\"stack\":30,\"experience\":20,\"salary\":20,\"format\":15,\"duties\":10,\"preferences\":5}")
+  lastScanAt      DateTime?
+  nextScanAt      DateTime              @default(now())
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  resumes         SearchProfileResume[]
+  applications    Application[]
+
+  @@index([active, nextScanAt])
+}
+
+model SearchProfileResume {
+  searchId String
+  resumeId String
+  search   SearchProfile @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  resume   Resume        @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@id([searchId, resumeId])
+}
+
+model Vacancy {
+  id               String        @id
+  title            String
+  employerId       String
+  employer         String
+  salaryFrom       Int?
+  salaryTo         Int?
+  currency         String?
+  workFormats      String[]
+  description      String
+  url              String
+  publishedAt      DateTime
+  archived         Boolean       @default(false)
+  requiresLetter   Boolean       @default(false)
+  hasTest          Boolean       @default(false)
+  externalResponse Boolean       @default(false)
+  raw              Json
+  updatedAt        DateTime      @updatedAt
+  applications     Application[]
+}
+
+model Application {
+  id           String              @id @default(cuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vacancyId    String
+  vacancy      Vacancy             @relation(fields: [vacancyId], references: [id])
+  searchId     String
+  search       SearchProfile       @relation(fields: [searchId], references: [id])
+  resumeId     String?
+  resume       Resume?             @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  status       ApplicationStatus   @default(DISCOVERED)
+  pipeline     String              @default("PENDING")
+  externalId   String?
+  resultSource String?
+  approvedAt   DateTime?
+  appliedAt    DateTime?
+  respondedAt  DateTime?
+  error        String?
+  feedback     String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  analysis     VacancyAnalysis?
+  letter       CoverLetter?
+  questions    ScreeningQuestion[]
+  tasks        UserTask[]
+  events       AgentEvent[]
+
+  @@unique([userId, vacancyId])
+  @@unique([userId, vacancyId, resumeId])
+  @@index([userId, status])
+}
+
+model VacancyAnalysis {
+  id            String      @id @default(cuid())
+  applicationId String      @unique
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  score         Int
+  confidence    Float
+  decision      String
+  reason        String
+  data          Json
+  createdAt     DateTime    @default(now())
+}
+
+model CoverLetter {
+  id            String      @id @default(cuid())
+  applicationId String      @unique
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  text          String
+  factIds       String[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model ScreeningQuestion {
+  id            String           @id @default(cuid())
+  applicationId String
+  application   Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  text          String
+  category      String
+  materials     String[]
+  deadline      DateTime?
+  technologies  String[]
+  answer        ScreeningAnswer?
+  createdAt     DateTime         @default(now())
+}
+
+model ScreeningAnswer {
+  id         String            @id @default(cuid())
+  questionId String            @unique
+  question   ScreeningQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String
+  factIds    String[]
+  approved   Boolean           @default(false)
+}
+
+model EmployerMessage {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  externalId String
+  vacancyId  String?
+  chatId     String
+  text       String
+  category   String   @default("PENDING")
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, externalId])
+}
+
+model UserTask {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  dedupeKey     String       @unique
+  title         String
+  description   String
+  type          String
+  priority      String       @default("NORMAL")
+  deadline      DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+
+  @@index([userId, completedAt])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dedupeKey String    @unique
+  subject   String
+  body      String
+  path      String    @default("/attention")
+  status    String    @default("PENDING")
+  error     String?
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model AgentExecution {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       String
+  status     String    @default("RUNNING")
+  error      String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+}
+
+model AgentEvent {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  kind          String
+  message       String
+  createdAt     DateTime     @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model AIProviderConfig {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose      String
+  provider     String    @default("OPENAI")
+  baseUrl      String
+  apiKey       String?
+  model        String
+  temperature  Float     @default(0.2)
+  maxTokens    Int       @default(1800)
+  language     String    @default("ru")
+  instructions String    @default("")
+  dailyBudget  Float     @default(1)
+  inputPrice   Float     @default(0)
+  outputPrice  Float     @default(0)
+  usages       AIUsage[]
+
+  @@unique([userId, purpose])
+}
+
+model AIUsage {
+  id            String           @id @default(cuid())
+  configId      String
+  config        AIProviderConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  inputTokens   Int
+  outputTokens  Int
+  reservedCost  Float            @default(0)
+  estimatedCost Float
+  createdAt     DateTime         @default(now())
+
+  @@index([configId, createdAt])
+}
+
+model AppSettings {
+  userId             String    @id
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentState         String    @default("STOPPED")
+  dryRun             Boolean   @default(true)
+  dailyLimit         Int       @default(20)
+  employerLimit      Int       @default(2)
+  activeStart        Int       @default(9)
+  activeEnd          Int       @default(19)
+  timezone           String    @default("Europe/Moscow")
+  letterInstructions String    @default("")
+  smtpHost           String    @default("")
+  smtpPort           Int       @default(587)
+  smtpUser           String    @default("")
+  smtpSecret         String?
+  smtpTls            Boolean   @default(true)
+  smtpFrom           String    @default("")
+  notificationTypes  String[]  @default(["TASK", "INVITATION", "MESSAGE", "AUTH", "PAUSE", "LIMIT", "DIGEST"])
+  lastDigestDate     String?
+  chatPage           Int       @default(0)
+  lastSyncAt         DateTime?
+  blacklist          String[]
+  blockedVacancies   String[]
+  updatedAt          DateTime  @updatedAt
+}
+
+model RateLimit {
+  key       String   @id
+  count     Int      @default(1)
+  expiresAt DateTime
+}
+
+model ChatCursor {
+  id            String   @id
+  lastMessageId String?
+  updatedAt     DateTime @updatedAt
+}

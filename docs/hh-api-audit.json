@@ -1,0 +1,43 @@
+{
+  "checkedAt": "2026-10-27",
+  "source": "https://api.hh.ru/openapi/specification/public",
+  "sha256": "799797d06ffb54528589d6587ab2af1c71462e3557d2a80432240223bc726524",
+  "checks": [
+    {
+      "path": "/me",
+      "methods": ["get"]
+    },
+    {
+      "path": "/token",
+      "methods": ["post", "delete"]
+    },
+    {
+      "path": "/vacancies",
+      "methods": ["post", "get"]
+    },
+    {
+      "path": "/vacancies/{vacancy_id}",
+      "methods": ["get", "put"]
+    },
+    {
+      "path": "/negotiations",
+      "methods": ["get"]
+    },
+    {
+      "path": "/negotiations/response",
+      "methods": ["get"]
+    },
+    {
+      "path": "/resumes/mine",
+      "methods": []
+    },
+    {
+      "path": "/common/chats",
+      "methods": ["get"]
+    },
+    {
+      "path": "/common/chats/{chat_id}/messages",
+      "methods": ["get", "post"]
+    }
+  ]
+}
